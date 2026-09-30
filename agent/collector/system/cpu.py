@@ -45,7 +45,7 @@ async def collect_cpu(event_bus):
                 "5m": load_5m,
                 "15m": load_15m,
             },
-            "io_wait": cpu_times.iowait,
+            "io_wait": getattr(cpu_times, "iowait", 0.0),
             "user_time": cpu_times.user,
             "system_time": cpu_times.system,
             "context_switches": ctx_switches,

@@ -1,12 +1,31 @@
 import { useMetrics } from '../../context/MetricsContext';
 
 export default function ConnectionMetrics() {
-  const { networkConnectionMetrics } = useMetrics();
+  const { networkConnectionMetrics, connectionTrendsHistory } = useMetrics();
   const d = networkConnectionMetrics?.data ?? {};
-  
-  const total = d.total_connections || 0;
-  const tcp = d.tcp_connections || 0;
-  const udp = d.udp_connections || 0;
+
+  const total = d.total_connections ?? 0;
+  const tcp = d.tcp_connections ?? 0;
+  const udp = d.udp_connections ?? 0;
+
+  // Derive the change from the collected trend history (was a hard-coded value).
+  const history = connectionTrendsHistory ?? [];
+  let deltaLabel = 'Awaiting data';
+  let deltaClass = 'text-slate-500';
+  let deltaIcon = '•';
+  if (history.length >= 2) {
+    const first = history[0]?.total ?? 0;
+    const last = history[history.length - 1]?.total ?? 0;
+    if (first > 0) {
+      const pct = ((last - first) / first) * 100;
+      deltaLabel = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% since tracking`;
+      deltaClass = pct >= 0 ? 'text-emerald-500' : 'text-red-500';
+      deltaIcon = pct >= 0 ? '📈' : '📉';
+    } else {
+      deltaLabel = `${history.length} samples`;
+      deltaClass = 'text-slate-400';
+    }
+  }
 
   return (
     <div className="bg-slate-900 border border-slate-800/50 rounded-lg p-8 flex flex-col justify-between h-full">
@@ -29,9 +48,9 @@ export default function ConnectionMetrics() {
           </div>
         </div>
       </div>
-      <div className="pt-6 border-t border-slate-800/50 flex items-center gap-2 text-emerald-500">
-        <span className="text-sm">📈</span>
-        <span className="text-xs font-semibold">+4.2% from last hour</span>
+      <div className={`pt-6 border-t border-slate-800/50 flex items-center gap-2 ${deltaClass}`}>
+        <span className="text-sm">{deltaIcon}</span>
+        <span className="text-xs font-semibold">{deltaLabel}</span>
       </div>
     </div>
   );

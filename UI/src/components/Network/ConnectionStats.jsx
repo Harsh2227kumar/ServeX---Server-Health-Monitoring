@@ -4,28 +4,37 @@ export default function ConnectionStats() {
   const { networkConnectionMetrics } = useMetrics();
   const d = networkConnectionMetrics?.data ?? {};
   
-  const est = d.established_connections || 0;
-  const listen = d.listening_sockets || 0;
-  const tw = d.time_wait_connections || 0;
+  const est = d.established_connections ?? 0;
+  const listen = d.listening_sockets ?? 0;
+  const tw = d.time_wait_connections ?? 0;
+
+  // Derive status from the live values instead of hard-coded labels.
+  const timeWaitRatio = est > 0 ? tw / est : tw;
+  const timeWaitStatus =
+    timeWaitRatio > 1
+      ? { label: 'ELEVATED', color: 'text-amber-500' }
+      : timeWaitRatio > 0.3
+        ? { label: 'NORMAL', color: 'text-emerald-500' }
+        : { label: 'LOW', color: 'text-slate-400' };
 
   const stats = [
     {
       label: 'Established Connections',
       value: est.toLocaleString(),
-      status: 'STABLE',
-      statusColor: 'text-emerald-500',
+      status: est > 0 ? 'ACTIVE' : 'IDLE',
+      statusColor: est > 0 ? 'text-emerald-500' : 'text-slate-400',
     },
     {
       label: 'Listening Sockets',
       value: listen.toLocaleString(),
-      status: 'STATIC',
+      status: listen > 0 ? 'BOUND' : 'NONE',
       statusColor: 'text-slate-400',
     },
     {
       label: 'Time Wait Connections',
       value: tw.toLocaleString(),
-      status: 'MODERATE',
-      statusColor: 'text-amber-500',
+      status: timeWaitStatus.label,
+      statusColor: timeWaitStatus.color,
     },
   ];
 

@@ -98,7 +98,7 @@ export default function ProcessDetailsTable() {
                           <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 inline-block rounded uppercase tracking-widest">{proc.status}</span>
                         </div>
                         <div>
-                          <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-1">Throughput (OUT)</p>
+                          <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-1">Activity Weight</p>
                           <p className="text-xs font-mono text-slate-300">{proc.throughput}</p>
                         </div>
                         <div>

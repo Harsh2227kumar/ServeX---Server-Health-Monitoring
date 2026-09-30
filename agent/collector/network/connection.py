@@ -2,6 +2,94 @@ import psutil
 import time
 import os # for log file access
 import socket
+import subprocess
+
+
+# TCP states as reported by `netstat -an`
+_TCP_STATES = {
+    "ESTABLISHED", "LISTEN", "TIME_WAIT", "CLOSE_WAIT", "SYN_SENT",
+    "SYN_RECEIVED", "LAST_ACK", "CLOSING", "CLOSED", "FIN_WAIT_1",
+    "FIN_WAIT_2",
+}
+
+
+def _netstat_connections():
+    """
+    Fallback connection enumeration via `netstat -an`.
+
+    Used when psutil cannot enumerate sockets (e.g. macOS without root).
+    Returns a list of normalized connection dicts.
+    """
+    try:
+        result = subprocess.run(
+            ["netstat", "-an"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+    connections = []
+
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+
+        proto = parts[0]
+        if proto.startswith("tcp"):
+            conn_type = "tcp"
+        elif proto.startswith("udp"):
+            conn_type = "udp"
+        else:
+            continue
+
+        status = None
+        if conn_type == "tcp" and parts[-1] in _TCP_STATES:
+            status = parts[-1]
+
+        connections.append({
+            "type": conn_type,
+            "status": status,
+            "laddr": parts[3],
+            "raddr": parts[4] if len(parts) >= 5 else None,
+        })
+
+    return connections
+
+
+def _connection_snapshot():
+    """
+    Return a platform-independent list of connection dicts.
+
+    Prefers psutil; falls back to netstat when the OS denies enumeration
+    (macOS requires elevated privileges for psutil.net_connections()).
+    """
+    try:
+        raw = psutil.net_connections()
+    except (psutil.AccessDenied, PermissionError):
+        return _netstat_connections()
+
+    snapshot = []
+
+    for conn in raw:
+        if conn.type == socket.SOCK_STREAM:
+            conn_type = "tcp"
+        elif conn.type == socket.SOCK_DGRAM:
+            conn_type = "udp"
+        else:
+            conn_type = "other"
+
+        snapshot.append({
+            "type": conn_type,
+            "status": conn.status,
+            "laddr": (conn.laddr.ip, conn.laddr.port) if conn.laddr else None,
+            "raddr": (conn.raddr.ip, conn.raddr.port) if conn.raddr else None,
+        })
+
+    return snapshot
+
 
 prev_established_conns = set()
 prev_timestamp = None
@@ -114,19 +202,20 @@ def failed_connections_logs(log_file="/var/log/syslog", keywords=None):
 
 # established connections per second 
 
-def established_connection_rate():
+def established_connection_rate(snapshot=None):
     global prev_established_conns, prev_timestamp
 
     current_time = time.time()
-    connections = psutil.net_connections()
+
+    if snapshot is None:
+        snapshot = _connection_snapshot()
 
     # extract only ESTABLISHED connections
-    current_established = set()
-
-    for conn in connections:
-        if conn.status == "ESTABLISHED":
-            key = (conn.laddr, conn.raddr, conn.type)
-            current_established.add(key)
+    current_established = {
+        (c["laddr"], c["raddr"], c["type"])
+        for c in snapshot
+        if c["status"] == "ESTABLISHED"
+    }
 
     # first run
     if prev_timestamp is None:
@@ -156,30 +245,14 @@ async def collect_network_connections(event_bus):
     Collect network connection-related metrics using psutil.
     """
 
-    connections = psutil.net_connections()
+    snapshot = _connection_snapshot()
 
-    total_connections = len(connections)
-
-    tcp_connections = 0
-    udp_connections = 0
-    established_connections = 0
-    listening_sockets = 0
-    time_wait_connections = 0
-
-    for conn in connections:
-        # Type
-        if conn.type == socket.SOCK_STREAM:
-            tcp_connections += 1
-        elif conn.type == socket.SOCK_DGRAM:
-            udp_connections += 1
-
-        # Status (only applies to TCP)
-        if conn.status == "ESTABLISHED":
-            established_connections += 1
-        elif conn.status == "LISTEN":
-            listening_sockets += 1
-        elif conn.status == "TIME_WAIT":
-            time_wait_connections += 1
+    total_connections = len(snapshot)
+    tcp_connections = sum(1 for c in snapshot if c["type"] == "tcp")
+    udp_connections = sum(1 for c in snapshot if c["type"] == "udp")
+    established_connections = sum(1 for c in snapshot if c["status"] == "ESTABLISHED")
+    listening_sockets = sum(1 for c in snapshot if c["status"] == "LISTEN")
+    time_wait_connections = sum(1 for c in snapshot if c["status"] == "TIME_WAIT")
 
     event = {
         "timestamp": time.time(),
@@ -193,7 +266,7 @@ async def collect_network_connections(event_bus):
             "time_wait_connections": time_wait_connections,
 
             # Derived / later
-            "connection_rate": established_connection_rate(),
+            "connection_rate": established_connection_rate(snapshot),
             "failed_connections_total": failed_connections_logs(),  #  there are two methods for this, failed connectionfrom logs
             "failed_connections_second" : failed_connections_snmp(per_minute=True)
         }

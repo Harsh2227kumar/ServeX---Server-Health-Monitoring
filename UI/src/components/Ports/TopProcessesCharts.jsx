@@ -46,7 +46,7 @@ export default function TopProcessesCharts() {
       {/* Top Processes by Activity */}
       <div className="bg-[#1a2332] border border-slate-800/50 rounded p-6">
         <div className="flex justify-between items-center mb-6">
-          <h4 className="text-sm font-bold uppercase tracking-widest text-slate-100">Top Processes by Activity (Req/s)</h4>
+          <h4 className="text-sm font-bold uppercase tracking-widest text-slate-100">Top Processes by Activity Score</h4>
           <span className="material-symbols-outlined text-slate-500 text-sm">more_vert</span>
         </div>
         <div className="space-y-4">

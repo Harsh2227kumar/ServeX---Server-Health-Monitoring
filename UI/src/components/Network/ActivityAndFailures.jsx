@@ -8,7 +8,8 @@ export default function ActivityAndFailures() {
   
   const lastActivity = data.length > 0 ? data[data.length - 1] : { connectionRate: 0, failureRate: 0 };
   const d = networkConnectionMetrics?.data ?? {};
-  const failedTotal = d.failed_connections_total || 0;
+  const failedTotal = d.failed_connections_total;
+  const hasFailedData = failedTotal != null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -57,8 +58,12 @@ export default function ActivityAndFailures() {
         <div className="bg-red-950/30 border border-red-900/30 rounded-lg p-6 flex flex-col justify-center h-[calc(50%-12px)]">
           <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-2">Failed Connections</p>
           <div className="flex items-baseline justify-between">
-            <p className="text-3xl font-bold tracking-tight text-red-500">{failedTotal}</p>
-            {failedTotal > 0 && <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-500 border border-red-500/30 uppercase">Spike Detected</div>}
+            {hasFailedData ? (
+              <p className="text-3xl font-bold tracking-tight text-red-500">{Number(failedTotal).toLocaleString()}</p>
+            ) : (
+              <p className="text-3xl font-bold tracking-tight text-slate-500" title="Unavailable on this platform">N/A</p>
+            )}
+            {hasFailedData && failedTotal > 0 && <div className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-500 border border-red-500/30 uppercase">Spike Detected</div>}
           </div>
         </div>
       </div>

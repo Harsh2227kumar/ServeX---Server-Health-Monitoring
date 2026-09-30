@@ -70,7 +70,7 @@ async def collect_process(event_bus):
                 zombie_processes += 1
 
             # Count total threads in the system
-            threads_total += info['num_threads']
+            threads_total += info['num_threads'] or 0
 
             # Count processes by user
             username = info['username']
@@ -104,10 +104,10 @@ async def collect_process(event_bus):
             continue
 
     # Identify top CPU consuming processes
-    top_cpu_processes = sorted(process_list,key=lambda p: p["cpu_percent"],reverse=True)[:TOP_N]
+    top_cpu_processes = sorted(process_list,key=lambda p: p["cpu_percent"] or 0,reverse=True)[:TOP_N]
 
     # Identify top memory consuming processes
-    top_memory_processes = sorted(process_list,key=lambda p: p["memory_percent"],reverse=True)[:TOP_N]
+    top_memory_processes = sorted(process_list,key=lambda p: p["memory_percent"] or 0,reverse=True)[:TOP_N]
 
     # Calculate number of new processes since last interval
     if not hasattr(collect_process, "_prev_total"):
